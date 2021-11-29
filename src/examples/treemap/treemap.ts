@@ -3,12 +3,15 @@ import { formatType, handleErrors } from '../common/utils'
 
 import {
   Row,
+  Link,
   Looker,
+  LookerChartUtils,
   VisualizationDefinition
 } from '../types/types'
 
 // Global values provided via the API
 declare var looker: Looker
+declare var LookerCharts: LookerChartUtils
 
 interface TreemapVisualization extends VisualizationDefinition {
   svg?: d3.Selection<SVGElement, {}, any, any>,
@@ -28,6 +31,7 @@ function descend(obj: any, depth: number = 0) {
     }
     if ('__data' in obj[k]) {
       child.data = obj[k].__data
+      child.links = obj[k].__data.taxonomy.links
     }
     arr.push(child)
   }
@@ -56,6 +60,17 @@ function burrow(table: Row[]) {
     children: descend(obj, 1),
     depth: 0
   }
+}
+
+const getLinksFromRow = (row: Row): Link[] => {
+  return Object.keys(row).reduce((links: Link[], datum) => {
+    if (row[datum].links) {
+      const datumLinks = row[datum].links as Link[]
+      return links.concat(datumLinks)
+    } else {
+      return links
+    }
+  }, [])
 }
 
 const vis: TreemapVisualization = {
@@ -94,6 +109,7 @@ const vis: TreemapVisualization = {
 
     data.forEach((row: Row) => {
       row.taxonomy = {
+        links: getLinksFromRow(row),
         value: dimensions.map((dimension) => row[dimension.name].value)
       }
     })
@@ -151,6 +167,13 @@ const vis: TreemapVisualization = {
           .style('stroke', (d) => {
             return null
           })
+      })
+      .on('click', function (this: any, d: any) {
+        const event: object = { pageX: d3.event.pageX, pageY: d3.event.pageY }
+        LookerCharts.Utils.openDrillMenu({
+          links: d.data.links,
+          event: event
+        })
       })
 
     cell.append('rect')
